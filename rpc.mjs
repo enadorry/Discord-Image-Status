@@ -30,3 +30,44 @@ export class Discord extends EventEmitter{
 }
 
 
+
+// One independent RPC session for each running desktop client (Stable/Canary/PTB).
+export class DiscordGroup extends EventEmitter {
+ constructor(paths=Array.from({length:10},(_,i)=>String.raw`\\?\pipe\discord-ipc-${i}`)){
+  super();this.closed=false;this.acknowledged=new Map();
+  this.clients=paths.map((path,index)=>{
+   const client=new Discord([path]);
+   client.on('ready',()=>{this.acknowledged.delete(client);this.emit('ready');});
+   return {client,index,path};
+  });
+ }
+ get ready(){return this.clients.some(({client})=>client.ready);}
+ get connections(){return this.clients.filter(({client})=>client.ready).map(({client,index})=>({slot:index,status:client.status,applied:this.acknowledged.has(client)}));}
+ get status(){
+  const connected=this.connections;
+  if(this.closed)return '終了しました';
+  if(!this.clientId)return 'Application IDを設定してください';
+  if(!connected.length)return 'Discordデスクトップ版を起動してください（自動接続）';
+  const errors=connected.filter(c=>c.status.includes('エラー'));
+  return `${connected.length}個のDiscordに接続済み${errors.length?' ／ '+errors.map(c=>`接続先${c.slot+1}: ${c.status}`).join(' ／ '):''}`;
+ }
+ async connect(id){
+  if(this.closed||!id)return;this.clientId=id;
+  await Promise.all(this.clients.map(({client})=>client.connect(id)));
+  if(this.closed)for(const {client}of this.clients)client.close();
+ }
+ async set(value){
+  const connected=this.clients.filter(({client})=>client.ready);
+  if(!connected.length)return false;
+  const signature=JSON.stringify(value);
+  const results=await Promise.all(connected.map(async({client})=>{
+   if(this.acknowledged.get(client)===signature)return true;
+   const socket=client.socket;
+   const ok=await client.set(value);
+   if(ok&&client.ready&&client.socket===socket)this.acknowledged.set(client,signature);
+   return ok;
+  }));
+  return results.every(Boolean);
+ }
+ close(){this.closed=true;for(const {client}of this.clients)client.close();this.acknowledged.clear();}
+}

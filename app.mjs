@@ -3,11 +3,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {spawn} from 'node:child_process';
-import {Discord} from './rpc.mjs';
+import {DiscordGroup} from './rpc.mjs';
 import {settings,presence} from './settings.mjs';
 const directory=path.dirname(fileURLToPath(import.meta.url));
-export function createApp({port=32146,configPath=path.join(directory,'config.json'),discord=new Discord()}={}){
- let config={clientId:'',title:'お気に入りの画像',description:'',image:'',type:2,enabled:false};
+export function createApp({port=32146,configPath=path.join(directory,'config.json'),discord=new DiscordGroup()}={}){
+ let config={clientId:'',title:'お気に入りの画像',description:'',image:'',type:2,salesUrl:'',buttonLabel:'BOOTHで購入',enabled:false};
  try{config=settings(JSON.parse(fs.readFileSync(configPath,'utf8').replace(/^\uFEFF/,'')));}catch{}
  let applied=false,sent='',busy=false,revision=0;
  const origin=`http://127.0.0.1:${port}`;
@@ -31,7 +31,7 @@ export function createApp({port=32146,configPath=path.join(directory,'config.jso
    const [file,type]=publicFiles[req.url];res.writeHead(200,{'Content-Type':type,'Cache-Control':'no-store','X-Frame-Options':'DENY','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' https: blob:; frame-ancestors 'none'"});return res.end(fs.readFileSync(path.join(directory,file)));
   }
   if(req.headers['x-local-panel']!=='1'||(req.headers.origin&&req.headers.origin!==origin))return json(403,{error:'Invalid origin'});
-  if(req.method==='GET'&&req.url==='/api/status')return json(200,{config,status:discord.status,connected:discord.ready,applied});
+  if(req.method==='GET'&&req.url==='/api/status')return json(200,{config,status:discord.status,connected:discord.ready,connections:discord.connections||[],applied});
   if(req.method!=='POST'||req.url!=='/api/config')return json(404,{});
   if(req.headers.origin!==origin)return json(403,{});
   let size=0,chunks=[];

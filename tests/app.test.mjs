@@ -8,7 +8,7 @@ import path from 'node:path';
 import {settings,presence} from '../settings.mjs';
 import {frame,Decoder,Discord} from '../rpc.mjs';
 import {createApp} from '../app.mjs';
-const input={clientId:'123456789012345678',title:'好きな絵',description:'お気に入り',image:'https://example.com/picture.png?version=1',type:2,enabled:true};
+const input={clientId:'123456789012345678',title:'好きな絵',description:'お気に入り',image:'https://example.com/picture.png?version=1',type:2,enabled:true,salesUrl:'https://enadorry.booth.pm/items/9050171',buttonLabel:'BOOTHで購入'};
 test('arbitrary public image URL and uploaded asset name',()=>{assert.equal(settings(input).image,input.image);assert.equal(settings({...input,image:'my_image'}).image,'my_image');for(const image of ['file:///C:/a.png','http://example.com/a.png','https://user:pass@example.com/a.png','data:image/png,abc','C:\\a.png'])assert.throws(()=>settings({...input,image}));});
 test('listening card with image, title, description, hide and artwork change',()=>{const p=presence(settings(input));assert.equal(p.assets.large_image,input.image);assert.equal(p.details,input.title);assert.equal(p.status_display_type,2);assert.equal(p.state,input.description);assert.equal(p.type,2);assert.equal(presence(settings({...input,enabled:false})),null);assert.equal(presence(settings({...input,image:'other_image',description:''})).assets.large_image,'other_image');assert.equal(presence(settings({...input,description:''})).state,undefined);});
 test('settings validate application ID and activity type',()=>{assert.throws(()=>settings({...input,clientId:'bad'}));assert.throws(()=>settings({...input,type:4}));assert.equal(settings({...input,title:'a'.repeat(200)}).title.length,128);});
@@ -35,3 +35,15 @@ test('local panel: save, persist, show, stop, reject cross-origin and reconnect'
  }finally{await app.stop();assert.equal(path.dirname(configPath),dir);fs.rmSync(dir,{recursive:true,force:true});}
 });
 
+
+
+test('sales button, image link and title link point to the BOOTH page',()=>{
+ const config=settings(input),p=presence(config);
+ assert.deepEqual(p.buttons,[{label:'BOOTHで購入',url:input.salesUrl}]);assert.equal(p.details_url,input.salesUrl);assert.equal(p.assets.large_url,input.salesUrl);
+ const legacy=presence(settings({...input,salesUrl:undefined,buttonLabel:undefined}));assert.equal(legacy.buttons,undefined);assert.equal(legacy.details_url,undefined);assert.equal(legacy.assets.large_url,undefined);
+});
+test('sales URLs are validated and button label is bounded',()=>{
+ for(const salesUrl of ['javascript:alert(1)','http://example.com','https://user:pass@example.com','invalid','https://example.com/'+ 'x'.repeat(300)])assert.throws(()=>settings({...input,salesUrl}));
+ assert.equal(settings({...input,buttonLabel:'a'.repeat(100)}).buttonLabel.length,32);
+ assert.equal(settings({...input,buttonLabel:''}).buttonLabel,'BOOTHで購入');
+});

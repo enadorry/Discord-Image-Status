@@ -10,13 +10,17 @@ export function settings(input){
   let u;try{u=new URL(image);}catch{throw Error('画像にはhttps://で始まる直接URL、またはアセット名を入力してください');}
   if(u.protocol!=='https:'||u.username||u.password||image.length>2048)throw Error('画像URLにはhttps://で始まる公開画像のURLを入力してください');
  }
+ let salesUrl=String(input.salesUrl||'').trim();
+ if(salesUrl){let u;try{u=new URL(salesUrl);}catch{throw Error('販売ページのURLが不正です');}if(u.protocol!=='https:'||u.username||u.password||salesUrl.length>256)throw Error('販売ページには256文字以内のHTTPS URLを入力してください');salesUrl=u.href;if(salesUrl.length>256)throw Error('販売ページのURLが長すぎます');}
+ const buttonLabel=[...text(input.buttonLabel,'BOOTHで購入')].slice(0,32).join('')||'BOOTHで購入';
  const type=Number(input.type??2);if(![0,2,3].includes(type))throw Error('表示の種類が不正です');
- return {clientId,title,description,image,type,enabled:input.enabled===true};
+ return {clientId,title,description,image,type,salesUrl,buttonLabel,enabled:input.enabled===true};
 }
 export function presence(config){
  if(!config.enabled)return null;
  const title=config.title.length<2?config.title+' ':config.title;
  const result={type:config.type,status_display_type:2,details:title,assets:{large_image:config.image,large_text:title}};
  if(config.description)result.state=config.description.length<2?config.description+' ':config.description;
+ if(config.salesUrl){result.buttons=[{label:config.buttonLabel||'BOOTHで購入',url:config.salesUrl}];result.details_url=config.salesUrl;result.assets.large_url=config.salesUrl;}
  return result;
 }
